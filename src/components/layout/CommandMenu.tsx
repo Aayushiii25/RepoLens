@@ -1,8 +1,7 @@
 "use client"
 
-import * as React from "react"
+import { GlobalSearch } from "@/features/search/components/GlobalSearch"
 
 export function CommandMenu() {
-  // Foundation for command menu
-  return null
+  return <GlobalSearch />
 }

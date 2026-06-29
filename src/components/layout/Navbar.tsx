@@ -50,7 +50,11 @@ export function Navbar() {
 
         {/* Right: Actions */}
         <div className="flex flex-1 items-center justify-end space-x-2">
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          >
             <Search className="h-5 w-5" />
             <span className="sr-only">Search</span>
           </Button>
