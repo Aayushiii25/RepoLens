@@ -7,9 +7,10 @@ import { CommandMenu } from "./CommandMenu"
 
 interface AppShellProps {
   children: React.ReactNode
+  rightPanel?: React.ReactNode
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, rightPanel }: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -25,18 +26,11 @@ export function AppShell({ children }: AppShellProps) {
         </main>
 
         {/* Right Panel - Hidden on Mobile/Tablet */}
-        <aside className="hidden lg:block w-72 xl:w-80 border-l shrink-0 bg-muted/20">
-          <div className="p-6">
-            <h3 className="font-semibold text-lg mb-4">Repository Info</h3>
-            <div className="space-y-4 text-sm text-muted-foreground">
-              <p>Select a repository to view its details, AI insights, and activity.</p>
-              {/* Placeholders for AI Assistant / Activity */}
-              <div className="h-32 border border-dashed rounded-lg flex items-center justify-center">
-                AI Assistant Placeholder
-              </div>
-            </div>
-          </div>
-        </aside>
+        {rightPanel && (
+          <aside className="hidden lg:block w-72 xl:w-80 border-l shrink-0 bg-muted/20 overflow-y-auto">
+            {rightPanel}
+          </aside>
+        )}
       </div>
       <CommandMenu />
     </div>

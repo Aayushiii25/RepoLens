@@ -7,21 +7,20 @@ import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet"
 import { Sidebar } from "./Sidebar"
+import { cn } from "@/lib/utils"
 
 export function Navbar() {
   const { theme, setTheme } = useTheme()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center px-4 md:px-6">
+    <header className="sticky top-4 z-50 mx-4 border rounded-xl bg-background/80 backdrop-blur-md shadow-lg transition-colors duration-300">
+      <div className="flex h-24 items-center px-4 md:px-6">
         {/* Left: Mobile Sidebar toggle */}
         <div className="flex flex-1 items-center md:hidden">
           <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle sidebar</span>
-              </Button>
+            <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" />}>
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle sidebar</span>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72">
               <SheetHeader className="sr-only">
@@ -35,7 +34,18 @@ export function Navbar() {
 
         {/* Center: RepoLens */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <span className="text-xl font-bold tracking-tight">RepoLens</span>
+          <span 
+            className={cn(
+              "text-8xl font-extrabold tracking-tighter",
+              // Light Mode
+              "text-white [text-shadow:0_0_20px_rgba(180,0,1,1)] [-webkit-text-stroke:1px_rgba(180,0,1,1)]",
+              // Dark Mode
+              "dark:bg-clip-text dark:text-transparent dark:bg-gradient-to-r",
+              "dark:from-white dark:to-[#ff007f] dark:drop-shadow-[0_0_15px_rgba(255,215,0,0.6)]"
+            )}
+          >
+            RepoLens
+          </span>
         </div>
 
         {/* Right: Actions */}
