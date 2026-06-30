@@ -5,6 +5,9 @@ from app.db.session import engine, Base
 from app.models.repository import Repository  # noqa: F401 — needed for table creation
 from app.search.router import router as search_router
 from app.repository.router import router as repository_router
+from app.recommendations.router import router as recommendations_router
+from app.analytics.router import router as analytics_router
+from app.ai.router import router as ai_router
 from app.github.client import github_client
 
 
@@ -35,6 +38,9 @@ app.add_middleware(
 # Routes
 app.include_router(search_router)
 app.include_router(repository_router)
+app.include_router(recommendations_router)
+app.include_router(analytics_router)
+app.include_router(ai_router)
 
 
 @app.get("/")
