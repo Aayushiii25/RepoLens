@@ -4,11 +4,16 @@
     <strong>AI-Powered Open Source Discovery & Contribution Intelligence Platform</strong>
   </p>
   <p align="center">
-    <a href="#architecture">Architecture</a> •
-    <a href="#features">Features</a> •
-    <a href="#tech-stack">Tech Stack</a> •
-    <a href="#getting-started">Getting Started</a> •
-    <a href="#project-structure">Project Structure</a>
+    The operating system for open-source contributors — discover repositories, understand codebases, evaluate project health, and find the perfect issue to tackle.
+  </p>
+  <p align="center">
+    <a href="#-what-is-repolens">About</a> •
+    <a href="#-architecture">Architecture</a> •
+    <a href="#-features">Features</a> •
+    <a href="#-tech-stack">Tech Stack</a> •
+    <a href="#-getting-started">Getting Started</a> •
+    <a href="#-api-reference">API</a> •
+    <a href="#-roadmap">Roadmap</a>
   </p>
 </p>
 
@@ -16,116 +21,186 @@
 
 ## 💡 What is RepoLens?
 
-**RepoLens** is a full-stack platform that helps developers discover high-quality open-source repositories, evaluate repository health, and find meaningful contribution opportunities — powered by the GitHub GraphQL API and a cache-first backend architecture.
+Open source contribution is one of the most valuable ways for developers to grow. But existing tools make it harder than it needs to be:
 
-> Traditional GitHub search is keyword-only. RepoLens goes further — providing repository health scores, tech stack analysis, recommended issues by difficulty, and AI-powered summaries in a single, beautiful interface.
+- GitHub search is keyword-only — no semantic understanding
+- Beginners can't tell which repos match their skill level
+- "Good first issue" labels are inconsistent and often stale
+- Developers spend hours understanding unfamiliar codebases before writing a single line
+
+**RepoLens solves all of this.** It is a full-stack platform that combines a live GitHub GraphQL integration, cache-first backend, and a beautiful workspace UI to give developers a single place to:
+
+1. **Discover** — find repositories by meaning, not just keywords
+2. **Understand** — AI summaries, architecture overviews, tech stack detection
+3. **Contribute** — recommended issues sorted by difficulty, estimated time, and acceptance rate
 
 ---
 
 ## 🏗️ Architecture
 
-<a name="architecture"></a>
+<a name="-architecture"></a>
+
+### Current Implementation
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (Next.js)                       │
-│  Command Palette (⌘K) → Search Results → Repository Workspace  │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │ HTTP (REST)
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        BACKEND (FastAPI)                        │
-│                                                                 │
-│  ┌──────────┐   ┌──────────────┐   ┌─────────────────────────┐ │
-│  │  Router   │──▶│   Service    │──▶│    GitHub GraphQL API   │ │
-│  │ /api/v1/  │   │ (Cache-First)│   │  (Authenticated, Async) │ │
-│  └──────────┘   └──────┬───────┘   └─────────────────────────┘ │
-│                         │                                       │
-│              ┌──────────┼──────────┐                            │
-│              ▼                     ▼                            │
-│     ┌──────────────┐     ┌──────────────┐                      │
-│     │  TTL Cache    │     │   Database   │                      │
-│     │ (In-Memory)   │     │  (SQLite)    │                      │
-│     │  5-min TTL    │     │  Upsert-on-  │                      │
-│     │               │     │  write       │                      │
-│     └──────────────┘     └──────────────┘                      │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                      FRONTEND  (Next.js 15)                      │
+│   Command Palette (⌘K)  →  Results  →  Repository Workspace     │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │  HTTP / REST
+                                ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                       BACKEND  (FastAPI)                         │
+│                                                                  │
+│  GET /api/v1/search?q=react                                      │
+│                                                                  │
+│  ┌──────────────┐   ┌───────────────────┐                       │
+│  │    Router     │──▶│  Search Service   │                       │
+│  └──────────────┘   └────────┬──────────┘                       │
+│                               │                                  │
+│              ┌────────────────┼────────────────┐                │
+│              ▼                ▼                ▼                 │
+│    ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐  │
+│    │  TTL Cache   │  │   Database   │  │  GitHub GraphQL API │  │
+│    │ (In-Memory)  │  │  (SQLite)    │  │  (Authenticated)    │  │
+│    │   5-min TTL  │  │  Upsert-on-  │  │                     │  │
+│    │              │  │  write       │  │                     │  │
+│    └──────────────┘  └──────────────┘  └─────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Target Architecture (Roadmap)
+
+```
+                    ┌─────────────────────────────────────┐
+                    │        Next.js Frontend              │
+                    │  Dashboard • Search • Profile        │
+                    └────────────────┬────────────────────┘
+                                     │ REST + WebSocket
+                                     ▼
+                    ┌────────────────────────────────────────┐
+                    │          API Gateway (FastAPI)          │
+                    └────────┬──────────────┬────────────────┘
+                             │              │              │
+               ┌─────────────┘   ┌──────────┘   ┌─────────┘
+               ▼                  ▼               ▼
+      Search Service     Recommendation     Analytics Service
+               │             Service               │
+               ▼                  │               ▼
+          Qdrant DB         ML Inference       PostgreSQL
+               │              (XGBoost)
+               ▼
+      Embedding Service
+      (Sentence Transformers)
+               │
+               ▼
+      Feature Store + MLflow
 ```
 
 **Key architectural decisions:**
-- **Cache-first reads**: Search results are served from cache on subsequent requests (<50ms vs ~1s from GitHub)
-- **Upsert-on-write**: Every GitHub response is persisted to the database, building a local knowledge base over time
-- **Async I/O**: The GitHub client uses `httpx.AsyncClient` for non-blocking HTTP requests
-- **Clean separation**: The frontend never sees raw GitHub API responses — data is transformed by the service layer
+
+| Decision | Rationale |
+|---|---|
+| **Cache-first reads** | Subsequent identical searches return in <50ms instead of ~1s from GitHub |
+| **Upsert-on-write** | Every GitHub response is persisted — builds a local knowledge base over time |
+| **GraphQL over REST** | Fetch exactly the needed fields in one request — no over-fetching |
+| **Async I/O** | `httpx.AsyncClient` for non-blocking GitHub calls under load |
+| **Clean DTO pattern** | Frontend never sees raw GitHub responses — service layer transforms everything |
+| **LLM Gateway** (planned) | Single point for all AI calls — prompt management, caching, model routing |
 
 ---
 
 ## ✨ Features
 
-<a name="features"></a>
+<a name="-features"></a>
 
-### Implemented
+### ✅ Implemented
+
 | Feature | Description |
 |---|---|
-| 🔎 **Live GitHub Search** | Real-time repository search via GitHub GraphQL API with debounced input |
-| ⚡ **Command Palette** | `Ctrl+K` / `⌘K` powered search with keyboard navigation (arrow keys, Enter, Esc) |
-| 🏥 **Repository Health Score** | Visual health metrics: Activity, Security, Community, Documentation, Maintainability |
-| 🧱 **Tech Stack Detection** | Auto-detected technology badges for each repository |
-| 📊 **Recommended Issues** | Issue table with difficulty rating, estimated time, and acceptance rate |
-| 🕐 **Recent & Trending Searches** | Persisted search history (localStorage) + curated trending terms |
-| 🎨 **Dual Theme** | Dark mode with golden glow, light mode with blood-red aesthetic — fully responsive |
-| 💀 **Skeleton Loading** | Animated skeleton states — never a spinner, never a frozen page |
-| 🏛️ **3-Column Layout** | GitHub + Linear + VS Code inspired workspace with sticky sidebar |
+| 🔎 **Live GitHub Search** | Real-time search via GitHub GraphQL API with 400ms debounce |
+| ⚡ **Command Palette** | `Ctrl+K` / `⌘K` global search with full keyboard navigation |
+| 🏥 **Repository Health Score** | Activity, Security, Community, Documentation, Maintainability metrics |
+| 🧱 **Tech Stack Detection** | Auto-detected technology badges per repository |
+| 📊 **Recommended Issues** | Table with difficulty, estimated time, and acceptance rate |
+| 🕐 **Recent & Trending** | Persisted localStorage search history + curated trending terms |
+| 💀 **Skeleton Loading** | Animated skeleton states — no spinners, no frozen pages |
+| 🎨 **Dual Theme** | Dark (golden glow) + Light (blood-red aesthetic), fully responsive |
+| 🏛️ **3-Column Workspace** | GitHub + Linear + VS Code inspired layout with sticky sidebars |
+| 🗄️ **Cache + DB Layer** | Search results cached 5 min, persisted to SQLite via SQLAlchemy |
+| 📡 **REST API** | `GET /api/v1/search` with Swagger docs at `/docs` |
 
-### Planned
-- 🤖 AI-powered repository summaries (LLM integration)
-- 🧠 Semantic search via embeddings (Qdrant + Sentence Transformers)
-- 📈 Analytics dashboard (star trends, contributor growth)
-- 🔐 GitHub OAuth authentication
-- 🐳 Docker Compose for Postgres + Redis production setup
+### 🔮 Planned (per Roadmap)
+
+| Feature | Sprint |
+|---|---|
+| 🧠 Semantic search (Qdrant + Sentence Transformers) | Sprint 3 |
+| 🤖 AI-powered repository summaries (LLM Gateway) | Sprint 6 |
+| 📈 Analytics dashboard (stars, contributor trends) | Sprint 4 |
+| 🔐 GitHub OAuth + user profiles | Sprint 2 |
+| 💬 Repository Chat (RAG over README + code) | Sprint 6 |
+| 🎓 Contribution Coach — step-by-step guidance | Sprint 7 |
+| 📦 Docker Compose (Postgres + Redis + Qdrant) | Sprint 1 |
+| 🌐 VS Code extension, Slack/Discord bot | Future |
 
 ---
 
 ## 🛠️ Tech Stack
 
-<a name="tech-stack"></a>
+<a name="-tech-stack"></a>
 
 ### Frontend
 | Technology | Purpose |
 |---|---|
-| **Next.js 15** | React framework with App Router |
-| **TypeScript** | Type-safe development |
+| **Next.js 15** | React framework, App Router, Server Components |
+| **TypeScript** | Type-safe development end-to-end |
 | **Tailwind CSS** | Utility-first styling |
-| **shadcn/ui** | Headless UI component library |
-| **cmdk** | Command palette (keyboard-first search) |
-| **next-themes** | Dark/light mode support |
+| **shadcn/ui** | Accessible, composable UI component library |
+| **cmdk** | Keyboard-first command palette |
+| **next-themes** | Dark/light mode management |
+| **TanStack Query** | Server state management (planned) |
+| **Zustand** | UI state (planned) |
 
 ### Backend
 | Technology | Purpose |
 |---|---|
 | **FastAPI** | Async Python web framework |
-| **SQLAlchemy** | ORM with SQLite (swappable to PostgreSQL) |
-| **httpx** | Async HTTP client for GitHub API |
-| **Pydantic v2** | Request/response validation & serialization |
-| **In-Memory Cache** | TTL-based caching (Redis-compatible interface) |
+| **SQLAlchemy 2** | ORM with async support (SQLite now → PostgreSQL ready) |
+| **httpx** | Async HTTP client for GitHub GraphQL calls |
+| **Pydantic v2** | Request/response validation and serialization |
+| **In-Memory Cache** | TTL-based caching (Redis-compatible interface, trivial to swap) |
+| **Celery + Redis** | Background jobs — embedding generation, GitHub sync (planned) |
 
-### APIs
-| API | Purpose |
+### AI / ML (Planned)
+| Technology | Purpose |
 |---|---|
-| **GitHub GraphQL API** | Repository search, metadata, and issue data |
+| **Qdrant** | Vector database for semantic search |
+| **Sentence Transformers** | Text embeddings (all-MiniLM / bge-small) |
+| **XGBoost** | Repository health prediction model |
+| **MLflow** | ML experiment tracking + model registry |
+| **Hybrid Ranking** | BM25 keyword + vector search + cross-encoder re-ranking |
+
+### APIs & Infrastructure
+| Technology | Purpose |
+|---|---|
+| **GitHub GraphQL API** | Repository data, issues, contributors |
+| **Docker / Docker Compose** | Local service orchestration |
+| **Vercel** | Frontend deployment |
+| **Kubernetes** | Production backend deployment (planned) |
+| **Prometheus + Grafana** | Monitoring (planned) |
 
 ---
 
 ## 🚀 Getting Started
 
-<a name="getting-started"></a>
+<a name="-getting-started"></a>
 
 ### Prerequisites
 - **Node.js** ≥ 18
 - **Python** ≥ 3.11
-- **GitHub Personal Access Token** ([Generate here](https://github.com/settings/tokens) — Classic, `public_repo` scope)
+- **GitHub Personal Access Token** — [Generate here](https://github.com/settings/tokens) (Classic, `public_repo` scope)
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/Aayushiii25/RepoLens.git
@@ -136,19 +211,24 @@ cd RepoLens
 
 ```bash
 cd backend
+
+# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate        # macOS/Linux
+# .venv\Scripts\activate         # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Configure your GitHub token
-echo "GITHUB_TOKEN=ghp_your_token_here" > .env
-echo "DATABASE_URL=sqlite:///./repolens.db" >> .env
+# Set environment variables
+cp .env .env.local
+# Edit .env and set GITHUB_TOKEN=ghp_your_token_here
 
-# Run the server
+# Run
 uvicorn app.main:app --reload --port 8000
 ```
 
-📄 Swagger docs available at [http://localhost:8000/docs](http://localhost:8000/docs)
+📄 Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### 3. Start the Frontend
 
@@ -158,38 +238,52 @@ npm install
 npm run dev
 ```
 
-🌐 App available at [http://localhost:3002](http://localhost:3002)
+🌐 App: [http://localhost:3002](http://localhost:3002)
+
+### 4. Test It
+
+Press `Ctrl+K` and type `react` — you'll get live repository results from GitHub, cached and persisted automatically.
 
 ---
 
 ## 📁 Project Structure
 
-<a name="project-structure"></a>
-
 ```
 RepoLens/
-├── frontend/                    # Next.js 15 application
-│   ├── src/
-│   │   ├── app/                 # App Router (route groups)
-│   │   ├── components/          # Shared UI (Navbar, AppShell, shadcn)
-│   │   ├── features/            # Feature modules
-│   │   │   ├── repository/      #   Repository workspace components
-│   │   │   └── search/          #   Search & command palette
-│   │   ├── services/            # API client layer
-│   │   └── data/                # Static data (trending searches)
-│   └── package.json
+├── frontend/                         # Next.js 15 application
+│   └── src/
+│       ├── app/                      # App Router (route groups: dashboard, auth)
+│       ├── components/
+│       │   ├── layout/               # AppShell, Navbar, Sidebar, PageContainer
+│       │   └── ui/                   # shadcn/ui components
+│       ├── features/
+│       │   ├── repository/           # Repository workspace (Header, Tabs, Health, Issues)
+│       │   └── search/               # Command palette, suggestions, recent searches
+│       ├── services/                 # API client layer (search.ts)
+│       ├── hooks/                    # Custom React hooks
+│       ├── data/                     # Static data (trending searches)
+│       └── types/                    # Shared TypeScript types
 │
-├── backend/                     # FastAPI application
+├── backend/                          # FastAPI application
 │   ├── app/
-│   │   ├── core/                # Config, cache
-│   │   ├── db/                  # SQLAlchemy session & engine
-│   │   ├── github/              # GitHub GraphQL client
-│   │   ├── models/              # Database models
-│   │   ├── search/              # Search router, service, schemas
-│   │   └── main.py              # FastAPI entrypoint
-│   ├── docker/                  # Docker Compose (Postgres + Redis)
+│   │   ├── core/
+│   │   │   ├── config.py             # pydantic-settings config loader
+│   │   │   └── cache.py              # In-memory TTL cache (Redis-compatible)
+│   │   ├── db/
+│   │   │   └── session.py            # SQLAlchemy engine + session factory
+│   │   ├── github/
+│   │   │   └── client.py             # Async GraphQL client (singleton)
+│   │   ├── models/
+│   │   │   └── repository.py         # SQLAlchemy Repository model
+│   │   ├── search/
+│   │   │   ├── router.py             # GET /api/v1/search
+│   │   │   ├── service.py            # Cache → GitHub → DB → Cache logic
+│   │   │   └── schemas.py            # Pydantic DTOs
+│   │   └── main.py                   # FastAPI app, CORS, lifespan
+│   ├── docker/
+│   │   └── docker-compose.yml        # Postgres + Redis for production
 │   ├── requirements.txt
-│   └── .env                     # Environment variables
+│   └── .env
 │
 └── README.md
 ```
@@ -198,9 +292,16 @@ RepoLens/
 
 ## 📡 API Reference
 
+<a name="-api-reference"></a>
+
 ### `GET /api/v1/search?q={query}`
 
 Search GitHub repositories with caching.
+
+**Query Params:**
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `q` | string | ✅ | Search query (min 1 char) |
 
 **Response:**
 ```json
@@ -221,21 +322,84 @@ Search GitHub repositories with caching.
       "open_issues": 940,
       "topics": ["javascript", "frontend", "react"],
       "license": "MIT",
+      "default_branch": "main",
       "updated_at": "2026-06-29T10:00:00Z"
     }
   ]
 }
 ```
 
+**Caching behaviour:**
+- First call: ~1s (GitHub GraphQL)
+- Subsequent calls (within 5 min): <50ms (in-memory cache)
+- All results upserted to SQLite for persistence
+
+### Planned Endpoints
+
+```
+GET  /api/v1/repositories/{id}             Repository details + health
+GET  /api/v1/repositories/{id}/health      Health score breakdown
+GET  /api/v1/repositories/{id}/similar     Similar repositories
+POST /api/v1/search/semantic               Natural language search (Qdrant)
+POST /api/v1/recommendations/repositories  Skill-based repo suggestions
+POST /api/v1/recommendations/issues        Issue recommendations by difficulty
+POST /api/v1/ai/explain                    AI summary of a repository
+POST /api/v1/ai/contribution-coach         Step-by-step contribution guidance
+GET  /api/v1/repositories/trending         Trending repositories
+```
+
 ---
 
 ## 🧠 Engineering Highlights
 
-- **Cache-First Architecture**: First request hits GitHub (~1s). Subsequent identical searches are served from the in-memory TTL cache (<50ms). All results are persisted to the database for long-term storage.
-- **GraphQL over REST**: Uses GitHub's GraphQL API to fetch exactly the fields needed in a single request — no over-fetching.
-- **Debounced Search**: The frontend waits 400ms after the user stops typing before making an API call, preventing unnecessary requests.
-- **Clean DTO Pattern**: Raw GitHub GraphQL responses are never exposed to the frontend. The service layer transforms them into typed Pydantic models.
-- **Upsert Strategy**: Database writes use an "update if exists, insert if new" pattern to avoid duplicate records while keeping data fresh.
+| Pattern | Implementation |
+|---|---|
+| **Cache-First** | Read from cache first (TTL 5 min), fallback to GitHub on miss |
+| **Upsert-on-Write** | `INSERT ... ON CONFLICT DO UPDATE` — no duplicates, always fresh |
+| **GraphQL over REST** | Single request for 12 fields — stars, forks, language, topics, license, issues, branch |
+| **Debounced Search** | 400ms debounce in frontend prevents API floods while typing |
+| **DTO Pattern** | Raw GitHub responses never reach the frontend — Pydantic models as contract |
+| **Singleton Client** | One `httpx.AsyncClient` for all GitHub calls — connection pooling, shared auth |
+| **Lifespan Events** | DB tables auto-created on startup, GitHub client gracefully closed on shutdown |
+| **Feature-First Structure** | Frontend organized by `features/repository` and `features/search` — scales cleanly |
+
+---
+
+## 📈 Roadmap
+
+<a name="-roadmap"></a>
+
+Based on the full sprint plan:
+
+```
+Sprint 1  ✅  FastAPI + Next.js foundation
+Sprint 2  ✅  Repository workspace, command palette, search UI
+Sprint 3  ✅  Live GitHub search + cache-first backend
+Sprint 4  🔄  Semantic search (Qdrant), repository details + charts
+Sprint 5  ⬜  Repository health engine, recommendation engine
+Sprint 6  ⬜  AI summaries (LLM Gateway), repository chat (RAG)
+Sprint 7  ⬜  Contribution Coach, progress tracking
+Sprint 8  ⬜  Testing, performance, production deployment
+```
+
+**Performance targets:**
+- Search latency: **< 300ms**
+- Recommendation latency: **< 500ms**
+- API availability: **99.9%**
+- Scale: **5M+ repositories, 100M+ issues**
+
+---
+
+## 🤝 Contributing
+
+This project is actively developed. The architecture is designed to grow from a working MVP toward a production-grade ML platform.
+
+To contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/your-feature`)
+3. Commit your changes (`git commit -m "feat: add ..."`)
+4. Push and open a Pull Request
 
 ---
 
@@ -248,5 +412,6 @@ Search GitHub repositories with caching.
 ---
 
 <p align="center">
-  Built with ❤️ using Next.js, FastAPI, and the GitHub GraphQL API
+  <em>Built with Next.js, FastAPI, and the GitHub GraphQL API</em><br/>
+  <em>"The operating system for open-source contributors."</em>
 </p>
