@@ -1,374 +1,191 @@
-# RepoLens
+<p align="center">
+  <img src="docs/images/architecture.png" alt="RepoLens Architecture" width="700"/>
+</p>
 
-**AI-Powered Open Source Discovery and Contribution Intelligence Platform**
+<h1 align="center">RepoLens</h1>
 
-RepoLens helps developers discover high-quality open-source repositories, evaluate repository health, understand codebases, and find meaningful contribution opportunities — powered by the GitHub GraphQL API, a cache-first backend, and a planned semantic search engine.
+<p align="center">
+  <strong>AI-Powered Open Source Discovery & Contribution Intelligence Platform</strong>
+</p>
 
----
-
-## Problem Statement
-
-Open-source contribution is one of the most effective ways for developers to grow. Existing tools fail in several ways:
-
-- Repository discovery relies entirely on keyword matching
-- Beginners cannot determine which repositories match their skill level
-- "Good first issue" labels are inconsistent and frequently outdated
-- Developers spend hours reading unfamiliar codebases before contributing
-- Repository health and long-term sustainability are difficult to assess
-
-RepoLens addresses all of these problems in a single, unified developer workspace.
-
----
-
-## System Architecture
-
-```
-                    +---------------------------------------------+
-                    |           Next.js 15  (Frontend)            |
-                    |                                             |
-                    |   Command Palette   Repository Workspace    |
-                    |   Search Results    Health Dashboard        |
-                    +---------------------+-----------------------+
-                                          |
-                                   REST / WebSocket
-                                          |
-                    +---------------------v-----------------------+
-                    |          API Gateway  (FastAPI)             |
-                    +--------+-------------+-------------+--------+
-                             |             |             |
-               +-------------+   +---------+   +---------+---------+
-               |             |   |         |   |                   |
-               v             |   v         |   v                   |
-     Search Service          | Recommend   |  Analytics            |
-               |             |  Service    |  Service              |
-               v             |             |                       |
-          Qdrant DB          |  ML Models  |  PostgreSQL           |
-               |             |  (XGBoost)  |                       |
-               v             |             |                       |
-    Embedding Service        +------+------+                       |
-    (Sentence Transformers)         |                              |
-               |              Feature Store                        |
-               v              (Feast + MLflow)                     |
-       Hybrid Ranker                                               |
-    (BM25 + Vector + Cross                                         |
-         Encoder)                                                  |
-               |                                                   |
-               v                                                   |
-     Top Repository Results  <-------------------------------+-----+
-               |                         Redis Cache         |
-               +-------------------------------------------->+
-```
-
-### Current Implementation
-
-```
-     Browser
-        |
-        | Ctrl+K
-        v
-  Command Palette  (cmdk, Next.js)
-        |
-        | debounced 400ms
-        v
-  GET /api/v1/search?q=react
-        |
-        v
-  +-----+-----+
-  |           |
-  v           v
-Cache      GitHub GraphQL API
-(TTL 5m)   (httpx async client)
-  |           |
-  |           v
-  |      Transform response
-  |      (DTO pattern)
-  |           |
-  |           v
-  |       SQLite DB
-  |       (upsert-on-write)
-  |           |
-  +-----+-----+
-        |
-        v
-   JSON Response
-        |
-        v
-  Repository Result Cards
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js" alt="Next.js"/>
+  <img src="https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python" alt="Python"/>
+  <img src="https://img.shields.io/badge/Qdrant-Vector_DB-DC382D?style=flat-square" alt="Qdrant"/>
+  <img src="https://img.shields.io/badge/Gemini-LLM-4285F4?style=flat-square&logo=google" alt="Gemini"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker" alt="Docker"/>
+</p>
 
 ---
 
-## Data Flow
+## What is RepoLens?
 
-```
-User Types Query
-      |
-      v
- 400ms Debounce  (frontend)
-      |
-      v
- Cache Lookup
-      |
-    Hit?
-   /    \
- YES     NO
-  |       |
-  v       v
-Return  GitHub GraphQL API
- (<50ms)      |
-              v
-       Parse + Validate
-       (Pydantic v2)
-              |
-              v
-       Upsert to Database
-       (update if exists)
-              |
-              v
-       Write to Cache
-       (5 min TTL)
-              |
-              v
-       Return to Frontend
-```
+RepoLens is a full-stack platform that helps developers **discover, evaluate, and contribute** to open source projects — powered by machine learning, a hybrid search engine, and LLM-based code intelligence.
+
+Instead of relying on basic keyword searches and inconsistent "good first issue" labels, RepoLens provides:
+
+- **Semantic search** that understands natural language queries like *"distributed backend in Go using Redis"*
+- **Repository health scoring** across 5 dimensions — so you know if a project is actively maintained before investing time
+- **AI-powered contribution guidance** — step-by-step instructions tailored to your skill level
+- **Personalized recommendations** — repositories and issues matched to your programming skills
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="RepoLens Dashboard" width="700"/>
+</p>
 
 ---
 
-## Semantic Search Pipeline (Planned)
+## Key Features
 
-```
-User Query: "distributed backend in Go using Redis"
-      |
-      v
- Embedding Model
- (all-MiniLM-L6-v2 / bge-small-en)
-      |
-      v
- Qdrant Vector Search  (semantic similarity)
-      |
-      v
- BM25 Keyword Search  (exact term matching)
-      |
-      v
- Hybrid Fusion (RRF scoring)
-      |
-      v
- Cross Encoder Re-ranking
-      |
-      v
- Top 20 Repositories
-```
+### 🔍 Hybrid Search Engine
 
-This hybrid pipeline gives significantly better relevance than keyword search alone. A query like *"distributed backend in Go"* will surface repositories that do not explicitly contain those words but are semantically similar.
+The search pipeline combines **keyword matching** (BM25 via SQLite) with **vector similarity** (Qdrant + Sentence Transformers), then fuses results using **Reciprocal Rank Fusion (RRF)**. This means a query like *"real-time data pipeline"* surfaces semantically relevant repositories even if they don't contain those exact words.
 
----
+<p align="center">
+  <img src="docs/images/search_pipeline.png" alt="Hybrid Search Pipeline" width="600"/>
+</p>
 
-## Repository Health Engine (Planned)
+**How it works:**
+1. User query is encoded into a 384-dimensional vector using `all-MiniLM-L6-v2`
+2. BM25 keyword search runs against SQLite in parallel with Qdrant vector search
+3. Both result sets are merged using RRF scoring: `score(d) = Σ 1/(k + rank)`
+4. Top results are returned, ranked by combined relevance
 
-```
-Repository
-    |
-    +----------+----------+----------+----------+
-    |          |          |          |          |
-    v          v          v          v          v
- Commits    Issues    Pull Req   Releases  Contributors
-    |          |          |          |          |
-    +----------+----------+----------+----------+
-                          |
-                          v
-                  Feature Engineering
-                          |
-                          v
-               Health Prediction Model (XGBoost)
-                          |
-                          v
-              +------+--------+-------+--------+------+
-              |      |        |       |        |      |
-              v      v        v       v        v      v
-          Overall  Activity Security Comm    Docs  Maint.
-           Score   Score    Score   Score   Score  Score
-              |
-              v
-         Health Dashboard
-```
+### 🏥 Repository Health Engine
 
----
+Every repository is scored across **5 dimensions** based on real-time GitHub data:
 
-## Recommendation Engine (Planned)
+| Dimension | What It Measures |
+|---|---|
+| **Activity** | Push recency, PR velocity, commit frequency |
+| **Community** | Contributors, stars, forks, code of conduct |
+| **Documentation** | README quality, wiki presence, doc depth |
+| **Security** | License, security policy, dependency health |
+| **Maintainability** | Issue close rate, release cadence |
 
-```
-Developer Profile
-    |
-    +---------------+
-    |               |
-    v               v
-Programming      Contribution
-Languages        History
-    |               |
-    +-------+-------+
-            |
-            v
-   Semantic Matching
-   (embeddings + cosine similarity)
-            |
-            v
-   Collaborative Filtering
-   (users with similar skills liked...)
-            |
-            v
-   Repository Ranking
-   + Issue Ranking
-            |
-            v
-   Personalized
-   Contribution Roadmap
-```
+Each dimension includes **trend indicators** (improving/stable/declining) and **actionable recommendations** like *"Add a SECURITY.md file"* or *"Issue close rate is below 50%"*.
+
+### 🎯 Recommendation Engine
+
+Given a developer's skill set (e.g., `["Python", "FastAPI", "machine-learning"]`), the engine:
+
+1. Encodes skills into a vector and searches Qdrant for semantically similar repositories
+2. Applies **skill-affinity boosting** using a curated mapping (e.g., Python → Django, Flask, PyTorch)
+3. Scores open issues by matching labels against difficulty weights
+4. Returns ranked recommendations with explanations like *"Strong match — uses Python, tagged with machine-learning"*
+
+### 🤖 AI Gateway (LLM Integration)
+
+A centralized gateway routes all AI calls through a single service, providing:
+
+- **Repository explanations** — beginner-friendly summaries of what a project does
+- **Contribution coaching** — step-by-step PR guides tailored to your skills
+- **Multi-repo comparison** — AI-generated strengths/weaknesses analysis
+- **Repository chat** — ask questions about a codebase with context from the README
+
+All responses are cached to avoid redundant LLM calls. The model is swappable — currently Gemini, but the gateway abstracts the provider.
+
+### ⌨️ Command Palette Search
+
+A Spotlight-style command palette (`Ctrl+K`) with **400ms debouncing**, **live GitHub results**, and recent search history.
+
+<p align="center">
+  <img src="docs/images/command_palette.png" alt="Command Palette" width="600"/>
+</p>
+
+### 📊 Repository Workspace
+
+A complete workspace for evaluating any GitHub repository:
+
+- **Header** with stars, forks, license, last push date
+- **Tech Stack** with language percentage bar and colored badges
+- **Health Dashboard** with 5-dimension scoring and recommendations
+- **Open Issues** table with difficulty labels and estimated time
+- **Activity Timeline** showing recent commits
+- **AI Summary** with architecture overview and learning outcomes
+- **Top Contributors** with avatars
+- **Recent Releases** with version tags
+
+### 📈 Trending & Compare
+
+- **Trending page** — repositories ranked by star count from local data
+- **Compare page** — side-by-side stats table + AI-generated comparison for 2-5 repositories
 
 ---
 
-## AI Gateway Architecture (Planned)
+## Architecture
+
+<p align="center">
+  <img src="docs/images/architecture.png" alt="System Architecture" width="700"/>
+</p>
+
+The system follows a **microservice-ready monolith** pattern — logically separated services that can be extracted into independent services as scale demands.
+
+**Data flow:**
 
 ```
-   AI Summary
-       |
- Issue Explanation
-       |
- Repository Q&A
-       |
-Contribution Coach
-       |
-       v
- +------------------+
- |   LLM Gateway    |
- |                  |
- | Prompt Templates |
- | Response Cache   |
- | Rate Limiting    |
- | Model Routing    |
- +--------+---------+
-          |
-    +-----+------+
-    |             |
-    v             v
- OpenAI        Gemini
-              (or Ollama
-              for local)
+User types query → 400ms debounce → Cache check → GitHub GraphQL API
+→ Parse + validate (Pydantic v2) → Upsert to SQLite → Generate embeddings
+→ Store in Qdrant → Write to cache (5 min TTL) → Return to frontend
 ```
 
-A single gateway handles all AI calls. Swapping models, managing prompts, and controlling costs all happen in one place.
+**Key design decisions:**
 
----
-
-## Database Schema
-
-```
-Users
-  id, github_id, username, email, avatar_url, bio
-
-    |
-    +-------------------+--------------------+
-    |                   |                    |
-    v                   v                    v
-SavedRepositories   SavedSearches       UserSkills
-  user_id             user_id, query,     user_id, skill,
-  repository_id       filters             level, years_exp
-
-Repositories
-  id, github_repo_id, full_name, owner, description
-  primary_language, license, stars, forks, open_issues
-  topics (JSONB), created_at, updated_at, last_commit_at
-
-    |
-    +----------+----------+----------+
-    |          |          |          |
-    v          v          v          v
-Contributors  Issues   PullReqs   Releases
-  repo_id     repo_id   repo_id    repo_id
-  username    title     title      tag
-  avatar      state     merged     published_at
-  contribs    labels    merge_time download_count
-              diff.     review_ct
-
-RepositoryMetrics  (historical, powers charts)
-  repo_id, date, stars, forks, commits, issues, prs
-
-HealthScores
-  repo_id, overall, activity_score, security_score
-  community_score, documentation_score, maintainability_score
-
-Recommendations
-  user_id, repo_id, match_score, reason
-
-RepositorySummaries  (LLM output cache)
-  repo_id, summary, architecture, difficulty, learning_outcomes
-
-IssueRecommendations
-  user_id, issue_id, score, estimated_time
-```
-
-**Vector Database (Qdrant)**
-
-```
-Collection: repository_embeddings
-
-Payload per record:
-  {
-    "repo_id": 124,
-    "name": "CloudQuery",
-    "language": "Go",
-    "topics": ["etl", "cloud", "postgres"],
-    "stars": 14321
-  }
-
-Vector: 768 dimensions
-Generated from: README + description + topics + tech stack
-```
+| Decision | Reasoning |
+|---|---|
+| **GraphQL over REST** for GitHub | Single query fetches 12+ fields in one round trip |
+| **Cache-first reads** | Repeat searches return in <50ms; protects against rate limits |
+| **Upsert-on-write** | Local DB grows into a knowledge base over time |
+| **Async I/O everywhere** | httpx + FastAPI async = no thread contention |
+| **DTO pattern** | Frontend never receives raw third-party API data |
+| **LLM Gateway** | Swap models, manage prompts, cache responses — all in one place |
 
 ---
 
 ## Tech Stack
 
-**Frontend**
+### Frontend
 
-| Technology | Purpose |
+| Technology | Role |
 |---|---|
-| Next.js 15 | React framework, App Router |
-| TypeScript | Type safety across the codebase |
-| Tailwind CSS | Utility-first styling |
-| shadcn/ui | Accessible component library |
-| cmdk | Command palette with full keyboard navigation |
-| TanStack Query | Server state management |
-| Zustand | UI state |
+| **Next.js 15** | App Router, React Server Components |
+| **TypeScript** | End-to-end type safety |
+| **Tailwind CSS** | Utility-first styling |
+| **shadcn/ui** | Accessible, composable component library |
+| **cmdk** | Command palette with keyboard navigation |
+| **TanStack Query** | Server state management |
+| **Zustand** | Lightweight client state |
+| **Framer Motion** | Animations and transitions |
+| **Recharts** | Data visualization |
 
-**Backend**
+### Backend
 
-| Technology | Purpose |
+| Technology | Role |
 |---|---|
-| FastAPI | Async Python web framework |
-| SQLAlchemy 2 | ORM, currently SQLite, ready to swap to PostgreSQL |
-| httpx | Async HTTP client for GitHub GraphQL |
-| Pydantic v2 | Request / response validation |
-| Celery | Background jobs — embeddings, health scoring, GitHub sync |
-| Redis | Cache + task queue |
+| **FastAPI** | Async Python framework with auto-generated OpenAPI docs |
+| **SQLAlchemy 2** | ORM with SQLite (dev) / PostgreSQL (prod) |
+| **httpx** | Async HTTP client for GitHub GraphQL |
+| **Pydantic v2** | Request/response validation and DTOs |
+| **Celery + Redis** | Background jobs for embeddings and health scoring |
 
-**AI and ML**
+### AI / ML
 
-| Technology | Purpose |
+| Technology | Role |
 |---|---|
-| Qdrant | Vector database for semantic search |
-| Sentence Transformers | Text embedding models |
-| XGBoost | Repository health prediction |
-| MLflow | Experiment tracking, model registry |
+| **Qdrant** | Vector database for semantic search (384-dim vectors) |
+| **Sentence Transformers** | Text embedding with `all-MiniLM-L6-v2` |
+| **Google Gemini** | LLM for summaries, coaching, and chat |
+| **Reciprocal Rank Fusion** | Hybrid search result merging algorithm |
 
-**Infrastructure**
+### Infrastructure
 
-| Technology | Purpose |
+| Technology | Role |
 |---|---|
-| Docker Compose | Local service orchestration |
-| Vercel | Frontend deployment |
-| GitHub Actions | CI/CD pipeline |
-| Kubernetes | Production backend deployment |
-| Nginx | Reverse proxy |
+| **Docker Compose** | Local orchestration (PostgreSQL + Redis) |
+| **Vercel** | Frontend deployment |
+| **GitHub Actions** | CI/CD pipeline |
 
 ---
 
@@ -376,81 +193,83 @@ Generated from: README + description + topics + tech stack
 
 ```
 RepoLens/
-|
-+-- frontend/
-|   +-- src/
-|       +-- app/                    App Router route groups
-|       |   +-- (dashboard)/        Main workspace
-|       |   +-- (auth)/             Login / OAuth
-|       |
-|       +-- components/
-|       |   +-- layout/             AppShell, Navbar, Sidebar
-|       |   +-- ui/                 shadcn components
-|       |
-|       +-- features/
-|       |   +-- repository/         Repository workspace
-|       |   |   +-- RepositoryHeader.tsx
-|       |   |   +-- RepositoryHealth.tsx
-|       |   |   +-- RepositoryTabs.tsx
-|       |   |   +-- RecommendedIssues.tsx
-|       |   |   +-- TechStack.tsx
-|       |   |   +-- RepositorySidebar.tsx
-|       |   |
-|       |   +-- search/             Command palette
-|       |       +-- GlobalSearch.tsx
-|       |       +-- SearchResultRow.tsx
-|       |       +-- RecentSearches.tsx
-|       |       +-- SearchTabs.tsx
-|       |
-|       +-- services/               API client layer
-|       +-- hooks/                  Custom React hooks
-|       +-- types/                  Shared TypeScript types
-|
-+-- backend/
-    +-- app/
-    |   +-- core/
-    |   |   +-- config.py           pydantic-settings, loads .env
-    |   |   +-- cache.py            TTL cache (Redis-compatible interface)
-    |   |
-    |   +-- db/
-    |   |   +-- session.py          SQLAlchemy engine + session factory
-    |   |
-    |   +-- github/
-    |   |   +-- client.py           Async GraphQL client singleton
-    |   |
-    |   +-- models/
-    |   |   +-- repository.py       SQLAlchemy ORM model
-    |   |
-    |   +-- search/
-    |   |   +-- router.py           GET /api/v1/search
-    |   |   +-- service.py          Cache first logic
-    |   |   +-- schemas.py          Pydantic DTOs
-    |   |
-    |   +-- main.py                 App entrypoint, CORS, lifespan
-    |
-    +-- docker/
-    |   +-- docker-compose.yml      Postgres + Redis
-    |
-    +-- requirements.txt
+│
+├── frontend/
+│   └── src/
+│       ├── app/                         # Next.js App Router
+│       │   ├── (dashboard)/             # Main workspace + trending + compare
+│       │   ├── (auth)/                  # Login / OAuth
+│       │   └── (layout)/               # Shared layout shell
+│       ├── components/
+│       │   ├── layout/                  # AppShell, Navbar, Sidebar
+│       │   ├── ui/                      # shadcn components (20+)
+│       │   └── common/                  # Providers (theme, query)
+│       ├── features/
+│       │   ├── repository/              # Full repository workspace
+│       │   │   └── components/          # Header, Health, Tabs, Issues, Activity...
+│       │   └── search/                  # Command palette
+│       │       ├── components/          # GlobalSearch, SearchResultRow, Tabs
+│       │       └── hooks/               # useRecentSearches
+│       └── services/                    # API client (api.ts)
+│
+└── backend/
+    └── app/
+        ├── core/
+        │   ├── config.py                # pydantic-settings, env loading
+        │   ├── cache.py                 # TTL cache (Redis-compatible)
+        │   └── vector/client.py         # Qdrant client singleton
+        ├── db/session.py                # SQLAlchemy engine + session
+        ├── github/client.py             # Async GraphQL client (530 lines)
+        ├── models/repository.py         # SQLAlchemy ORM model
+        ├── search/
+        │   ├── router.py                # GET /search + POST /search/semantic
+        │   ├── service.py               # Cache-first logic + embedding indexing
+        │   ├── hybrid.py                # Reciprocal Rank Fusion (RRF)
+        │   └── schemas.py               # Pydantic DTOs
+        ├── repository/
+        │   ├── router.py                # GET /{owner}/{name}, /health, /similar
+        │   ├── health.py                # Health scoring engine (5 dimensions)
+        │   └── schemas.py               # RepositoryDetailDTO, IssueDTO, etc.
+        ├── recommendations/
+        │   ├── router.py                # POST /repositories, POST /issues
+        │   └── engine.py                # Skill matching + issue scoring
+        ├── ai/
+        │   └── router.py               # Contribution coach, explain, compare, chat
+        ├── analytics/
+        │   └── router.py               # Trending, language trends, topic trends
+        ├── ml/
+        │   ├── llm.py                   # LLM Gateway (Gemini, cached, swappable)
+        │   └── embeddings.py            # SentenceTransformer service
+        └── main.py                      # FastAPI entrypoint, CORS, lifespan
 ```
 
 ---
 
-## API Reference
+## API Endpoints
 
-### GET /api/v1/search
+### Implemented
 
-Search GitHub repositories.
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/search?q=react` | Keyword search with cache-first strategy |
+| `POST` | `/api/v1/search/semantic` | Hybrid search (BM25 + vector + RRF) |
+| `GET` | `/api/v1/repositories/{owner}/{name}` | Full repository details |
+| `GET` | `/api/v1/repositories/{owner}/{name}/health` | Detailed health score breakdown |
+| `GET` | `/api/v1/repositories/{owner}/{name}/issues` | Open issues with difficulty labels |
+| `GET` | `/api/v1/repositories/{owner}/{name}/activity` | Recent commit history |
+| `GET` | `/api/v1/repositories/{owner}/{name}/summary` | AI-generated repository summary |
+| `GET` | `/api/v1/repositories/{owner}/{name}/similar` | Similar repos via vector similarity |
+| `GET` | `/api/v1/analytics/trending` | Trending repositories by stars |
+| `GET` | `/api/v1/analytics/languages` | Language distribution analytics |
+| `GET` | `/api/v1/analytics/topics` | Topic/technology trend analytics |
+| `POST` | `/api/v1/recommendations/repositories` | Skill-based repo recommendations |
+| `POST` | `/api/v1/recommendations/issues` | Issue recommendations by difficulty |
+| `POST` | `/api/v1/ai/explain` | AI-powered repository explanation |
+| `POST` | `/api/v1/ai/contribution-coach` | Step-by-step contribution guidance |
+| `POST` | `/api/v1/ai/repositories/compare` | Multi-repo AI comparison |
+| `POST` | `/api/v1/ai/repositories/{owner}/{name}/chat` | Context-aware repository Q&A |
 
-Query parameters:
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| q | string | yes | Search query |
-| language | string | no | Filter by language |
-| minStars | integer | no | Minimum stars |
-
-Response:
+### Example Response — Search
 
 ```json
 {
@@ -461,132 +280,61 @@ Response:
     {
       "id": 1,
       "full_name": "facebook/react",
-      "owner": "facebook",
       "description": "The library for web and native user interfaces.",
       "language": "JavaScript",
       "stars": 232000,
       "forks": 47400,
-      "open_issues": 940,
-      "topics": ["javascript", "frontend", "react"],
-      "license": "MIT",
-      "updated_at": "2026-06-29T10:00:00Z"
+      "topics": ["javascript", "frontend", "react"]
     }
   ]
 }
 ```
 
-**Caching behaviour:**
-- First request: ~1 second (GitHub GraphQL)
-- Repeat request within 5 minutes: under 50ms (cache hit)
+### Example Response — Health
 
-### Planned Endpoints
-
-```
-GET  /api/v1/repositories/{id}              Full repository details
-GET  /api/v1/repositories/{id}/health       Health score breakdown
-GET  /api/v1/repositories/{id}/similar      Similar repositories
-GET  /api/v1/repositories/trending          Trending repositories
-POST /api/v1/search/semantic                Natural language search
-POST /api/v1/recommendations/repositories   Skill-based repo suggestions
-POST /api/v1/recommendations/issues         Issue recommendations
-POST /api/v1/ai/explain                     Repository AI summary
-POST /api/v1/ai/contribution-coach          Step-by-step contribution guide
-POST /api/v1/repositories/compare          Compare multiple repositories
-POST /api/v1/repositories/{id}/chat         RAG-powered repository Q&A
+```json
+{
+  "overall": { "score": 94, "label": "Excellent", "trend": "trending_up" },
+  "dimensions": {
+    "activity": { "score": 98, "label": "Excellent", "trend": "trending_up",
+      "factors": { "push_recency": "0 days ago", "merged_prs": 12500 }
+    },
+    "security": { "score": 95, "label": "Excellent",
+      "factors": { "has_license": true, "has_security_policy": true }
+    }
+  },
+  "recommendations": ["All health indicators are strong"]
+}
 ```
 
 ---
 
-## Deployment Architecture
+## Skills Demonstrated
 
-```
-          Internet
-              |
-              v
-      Nginx  (reverse proxy)
-              |
-              v
-      FastAPI Gateway
-              |
-   +----------+----------+
-   |          |          |
-   v          v          v
-Search     Recommend   Analytics
-Service    Service     Service
-   |          |          |
-   v          v          v
-PostgreSQL  Qdrant    Redis
-            (vectors)  (cache)
-              |
-              v
-           ML Models
-           (XGBoost, LLM Gateway)
-```
+This project demonstrates proficiency across the full stack:
 
-**Scaling strategy:**
-
-| Layer | Approach |
+| Area | Skills |
 |---|---|
-| Frontend | Vercel CDN |
-| API | Horizontal FastAPI instances behind Nginx |
-| Database | PostgreSQL with read replicas and indexing |
-| Search | Distributed Qdrant cluster |
-| ML | Separate inference service |
-| Cache | Redis with eviction policy |
-| Background Jobs | Celery with RabbitMQ |
-| Monitoring | Prometheus + Grafana |
+| **Backend Engineering** | Python, FastAPI, async I/O, REST API design, GraphQL integration |
+| **Frontend Engineering** | React 19, Next.js 15, TypeScript, component architecture, state management |
+| **Machine Learning** | Vector embeddings, semantic search, hybrid ranking, recommendation systems |
+| **System Design** | Cache-first architecture, DTO patterns, microservice-ready design |
+| **Database** | SQLAlchemy ORM, upsert patterns, SQLite → PostgreSQL migration path |
+| **AI/LLM Integration** | Prompt engineering, response caching, gateway pattern, model abstraction |
+| **DevOps** | Docker Compose, environment configuration, CI/CD readiness |
+| **Data Engineering** | ETL from GitHub API, feature engineering for health scores |
 
 ---
 
-## Performance Targets
+## Getting Started
 
-| Metric | Target |
-|---|---|
-| Search latency | < 300ms |
-| Recommendation latency | < 500ms |
-| API availability | 99.9% |
-| Repository coverage | 5M+ repositories |
-| Issue coverage | 100M+ issues |
+### Prerequisites
 
----
+- Node.js 18+
+- Python 3.11+
+- GitHub Personal Access Token ([create one here](https://github.com/settings/tokens) — `public_repo` scope)
 
-## Engineering Decisions
-
-**GraphQL over REST for GitHub**
-
-A single GraphQL query fetches all 12 required fields in one round trip. The REST API would require multiple requests for the same data.
-
-**Cache-first reads**
-
-Every search checks the in-memory cache before hitting GitHub. First request takes ~1s. All subsequent requests for the same query within 5 minutes return in under 50ms. This also protects against GitHub rate limits.
-
-**Upsert-on-write**
-
-Every GitHub response is written to the database using an update-if-exists pattern. Over time, the local database becomes a rich knowledge base that can power recommendations without calling GitHub at all.
-
-**Async I/O throughout**
-
-The GitHub client uses `httpx.AsyncClient`. The FastAPI endpoints are `async`. The database layer uses SQLAlchemy in non-blocking mode. The system can handle concurrent requests without thread contention.
-
-**DTO pattern**
-
-Raw GitHub responses are transformed by the service layer into typed Pydantic models before reaching the router. The frontend never receives unprocessed third-party API data.
-
-**LLM Gateway**
-
-Rather than allowing individual services to call LLM providers directly, all AI calls route through a single gateway. This provides centralized prompt management, response caching, rate limiting, and the ability to swap models without touching application code.
-
----
-
-## Local Setup
-
-**Prerequisites**
-
-- Node.js 18 or higher
-- Python 3.11 or higher
-- GitHub Personal Access Token (classic, public_repo scope)
-
-**Backend**
+### Backend
 
 ```bash
 cd backend
@@ -595,16 +343,17 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-# Add your token to .env
+# Configure environment
 echo "GITHUB_TOKEN=ghp_your_token" > .env
 echo "DATABASE_URL=sqlite:///./repolens.db" >> .env
 
+# Start the API server
 uvicorn app.main:app --reload --port 8000
 ```
 
-Swagger docs: http://localhost:8000/docs
+API docs available at: **http://localhost:8000/docs**
 
-**Frontend**
+### Frontend
 
 ```bash
 cd frontend
@@ -612,12 +361,31 @@ npm install
 npm run dev
 ```
 
-App: http://localhost:3002
+App available at: **http://localhost:3002**
+
+### Docker (PostgreSQL + Redis)
+
+```bash
+cd backend/docker
+docker-compose up -d
+```
+
+---
+
+## Future Roadmap
+
+- [ ] OAuth login with GitHub for personalized profiles
+- [ ] Celery workers for background embedding generation
+- [ ] Redis cache replacement for in-memory cache
+- [ ] PostgreSQL migration for production data
+- [ ] Cross-encoder re-ranking in the search pipeline
+- [ ] Kubernetes deployment manifests
+- [ ] Prometheus + Grafana monitoring
 
 ---
 
 ## Author
 
-Aayushi Dhurandhar
+**Aayushi Dhurandhar**
 
-GitHub: https://github.com/Aayushiii25
+GitHub: [github.com/Aayushiii25](https://github.com/Aayushiii25)

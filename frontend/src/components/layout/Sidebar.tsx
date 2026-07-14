@@ -8,7 +8,9 @@ import {
   Bookmark, 
   TrendingUp, 
   GitCommit, 
-  Settings 
+  Settings,
+  ArrowLeftRight,
+  Brain,
 } from "lucide-react"
 import { SidebarItem } from "./SidebarItem"
 import { SidebarSection } from "./SidebarSection"
@@ -19,7 +21,7 @@ const navigation = [
   {
     title: "Overview",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/", icon: LayoutDashboard },
       { label: "Discover", href: "/discover", icon: Compass },
     ]
   },
@@ -33,8 +35,15 @@ const navigation = [
   {
     title: "Insights",
     items: [
-      { label: "Trends", href: "/trends", icon: TrendingUp },
+      { label: "Trending", href: "/trending", icon: TrendingUp },
+      { label: "Compare", href: "/compare", icon: ArrowLeftRight },
       { label: "Contributions", href: "/contributions", icon: GitCommit },
+    ]
+  },
+  {
+    title: "AI Tools",
+    items: [
+      { label: "Smart Search", href: "/smart-search", icon: Brain },
     ]
   },
   {
